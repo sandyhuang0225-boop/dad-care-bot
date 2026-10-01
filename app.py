@@ -18,7 +18,7 @@ app = Flask(__name__)
 # ==================== LINE 金鑰與常數 ====================
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "f55dd65b985ddbf08b49e186c852807c")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "mvPNDntah+ry3krkhP0XYN/Ex3952Fqo6H454nwYTwGPlyOPUcx8dhW/708V3nalXVLLWi8Sqt/zfiXZ/WkaBNftApzEbiN1n8XOTZoMvMKGTyYLtoG674w+dukYmjU52n/7Pe+FTmNc77Xymlx5FwdB04t89/1O/w1cDnyilFU=")
-ADMIN_LINE_ID = os.getenv("ADMIN_LINE_ID", "Uc63f60ac0469e5f5a684081e20814dff")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
@@ -31,7 +31,71 @@ BASE_URL = os.getenv("RENDER_EXTERNAL_URL", "https://dad-care-bot.onrender.com")
 if not BASE_URL.startswith("https://"):
     BASE_URL = "https://" + BASE_URL.split("://")[-1]
 
-# ==================== Google Sheets 工具函式 ====================
+import base64
+import urllib.request
+
+def analyze_receipt_with_gemini(image_bytes):
+    """
+    使用 Google Gemini Flash 視覺模型辨識發票或收據中的品項與總金額
+    """
+    if not GEMINI_API_KEY:
+        return None
+    try:
+        b64_img = base64.b64encode(image_bytes).decode('utf-8')
+        prompt = """
+你是一個專業的發票與收據辨識助手。請仔細分析這張照片（發票、收據、明細單或購物清單）：
+1. 找出購買的品項摘要（例如：成人尿布、水果、生活用品、藥品、便當等，簡明扼要，10字以內）。
+2. 找出最關鍵的「最終總金額」或「實付金額」（注意：必須是整數數字，單位為元，若有多個金額請找出合計/總計/TOTAL）。
+3. 判斷費用分類，只能從以下 5 選 1：
+   - 伙食餐飲 (食物、飲料、水果、外食)
+   - 生活耗品 (尿布、紙巾、沐浴、衛生紙、日常消耗品)
+   - 醫療藥費 (藥局、掛號、門診、藥品)
+   - 交通接送 (計程車、油資、車資)
+   - 日常雜支 (其他)
+
+請嚴格只輸出 JSON 格式，不要有任何額外的文字或 markdown 標籤：
+{"item": "品項名稱", "amount": 850, "category": "生活耗品"}
+"""
+        req_body = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": "image/jpeg",
+                                "data": b64_img
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "response_mime_type": "application/json"
+            }
+        }
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(req_body).encode('utf-8'),
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            res_data = json.loads(resp.read().decode('utf-8'))
+            candidates = res_data.get("candidates", [])
+            if candidates:
+                text_out = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                text_out = re.sub(r'```json\s*|\s*```', '', text_out).strip()
+                data = json.loads(text_out)
+                amt = int(data.get("amount", 0))
+                item = str(data.get("item", "日常採買")).strip()
+                cat = str(data.get("category", "日常雜支")).strip()
+                return {"amount": amt, "item": item, "category": cat}
+    except Exception as e:
+        print(f"Gemini 圖片辨識失敗: {e}")
+    return None
+
 def get_gc():
     try:
         # 1. 優先從環境變數讀取 (避免 GitHub 攔截撤銷)
@@ -954,18 +1018,44 @@ def handle_image_message(event):
         display_name = "家人"
 
     user_name = get_user_name_by_id(user_id, display_name)
-
-    # 記錄一張發票/收據照片佔位記錄，方便直接補金額
     today_str = datetime.now().strftime("%Y/%m/%d")
     now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
 
-    reply_text = f"📸 收到【{user_name}】傳送的照片！\n\n"
-    reply_text += "🧾 若是【發票/收據報銷】：\n"
-    reply_text += f"請直接回傳金額（例如：`850` 或 `尿布 850`），系統將自動以【{user_name}】名義入帳！\n\n"
-    reply_text += "💊 若是【回診新藥袋】：\n"
-    reply_text += "請回傳藥名與服用時段（例如：`血壓藥 早上飯後1顆`）即自動歸檔至用藥手冊！\n\n"
-    reply_text += "💡 小叮嚀：若身分顯示不對，可輸入「綁定身分」一鍵更新！"
+    # 1. 下載 LINE 圖片二進制內容
+    message_content = line_bot_api.get_message_content(event.message.id)
+    image_bytes = b""
+    for chunk in message_content.iter_content():
+        image_bytes += chunk
 
+    # 2. 調用 Gemini Flash 視覺模型自動分析發票/收據
+    parsed = analyze_receipt_with_gemini(image_bytes)
+
+    if parsed and parsed.get("amount", 0) > 0:
+        amt = parsed["amount"]
+        item = parsed.get("item", "日常採買")
+        cat = parsed.get("category", "日常雜支")
+
+        ws = get_worksheet("支出明細")
+        if ws:
+            ws.append_row([
+                now_time, today_str, user_name, cat, item, amt, "", "AI發票拍照自動辨識"
+            ])
+            reply_text = f"📸 【AI 發票自動辨識記帳成功！】\n"
+            reply_text += f"• 支出代墊：{user_name}\n"
+            reply_text += f"• 辨識品項：{item}\n"
+            reply_text += f"• 費用分類：{cat}\n"
+            reply_text += f"• 發票金額：{amt:,} 元\n"
+            reply_text += f"• 記帳日期：{today_str}\n\n"
+            reply_text += f"✅ 已直接寫入 Google 試算表！\n"
+            reply_text += f"💡 若金額有辨識偏差，可直接輸入「金額改為 800」即時修正！"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+            return
+
+    # 若未辨識出金額（例如純日常照片、或收據模糊）
+    reply_text = f"📸 收到【{user_name}】傳送的照片！\n\n"
+    reply_text += "🧾 若為【發票/收據報銷】：\n"
+    reply_text += f"因照片金額較為模糊，請直接回傳金額（例如輸入：`850` 或 `尿布 850`），系統將自動以【{user_name}】名義入帳！\n\n"
+    reply_text += "💡 若要修改上一筆，隨時輸入「金額改為 XXX」即可！"
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text.strip()))
 
 # ==================== Web 網頁表單 (記帳、進項、高醫回診、用藥、日誌) ====================
