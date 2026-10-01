@@ -21,7 +21,7 @@ def init_google_sheets():
     ws_expense.update(range_name='A1:H1', values=[[
         "記錄時間", "購買日期", "支出人/代墊人", "分類", "品項名稱", "金額", "憑證照片網址", "備註"
     ]])
-    print("✅ 支出明細表完成")
+    print("[OK] Expense sheet ready")
 
     # 2. 進項明細表
     try:
@@ -31,7 +31,7 @@ def init_google_sheets():
     ws_income.update(range_name='A1:G1', values=[[
         "記錄時間", "入帳日期", "登記人", "來源類別", "進項說明", "金額", "備註"
     ]])
-    print("✅ 進項明細表完成")
+    print("[OK] Income sheet ready")
 
     # 3. 回診與領藥表
     try:
@@ -41,7 +41,7 @@ def init_google_sheets():
     ws_clinic.update(range_name='A1:H1', values=[[
         "看診/領藥日期", "時段", "醫院/藥局", "科別", "主治醫師", "掛號號碼", "備註事項/領藥區間", "提醒狀態"
     ]])
-    print("✅ 回診與領藥表完成")
+    print("[OK] Clinic sheet ready")
 
     # 4. 目前用藥清單
     try:
@@ -51,7 +51,7 @@ def init_google_sheets():
     ws_med.update(range_name='A1:G1', values=[[
         "藥品名稱", "作用/用途", "用法用量", "服用時段(早/中/晚/睡前)", "飯前/飯後", "注意事項", "外觀照片"
     ]])
-    print("✅ 目前用藥清單完成")
+    print("[OK] Medication sheet ready")
 
     # 5. 生活照護日誌
     try:
@@ -61,7 +61,7 @@ def init_google_sheets():
     ws_log.update(range_name='A1:G1', values=[[
         "記錄時間", "記錄人", "精神/心情狀況", "飲食/食慾狀況", "量測數據(血壓/血糖)", "今日活動/特殊狀況", "備註照片"
     ]])
-    print("✅ 照護日誌完成")
+    print("[OK] Care log sheet ready")
 
     # 6. 收支總表（自動摘要月度收支）
     try:
@@ -71,7 +71,7 @@ def init_google_sheets():
     ws_summary.update(range_name='A1:F1', values=[[
         "月份", "本月進項總額", "本月支出總額", "本月收支淨結餘", "累計專戶總結餘", "備註"
     ]])
-    print("✅ 收支總表完成")
+    print("[OK] Summary sheet ready")
 
     # 刪除預設的 Sheet1 (工作表1) 如果存在
     try:
@@ -84,7 +84,7 @@ def init_google_sheets():
         except:
             pass
 
-    print("🎉 爸爸照顧專戶所有工作表初始化完成！")
+    print("[SUCCESS] All worksheets initialized successfully!")
     return True
 
 if __name__ == "__main__":
