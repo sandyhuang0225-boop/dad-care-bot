@@ -187,7 +187,55 @@ def create_summary_flex(month_str, total_income, total_expense, net_balance, cat
                     TextComponent(text="📑 本月主要支出項目：", weight='bold', size='xs', color='#555555', margin='sm'),
                     *(cat_boxes if cat_boxes else [TextComponent(text="目前尚無支出記錄", size='xs', color='#999999')]),
                     SeparatorComponent(margin='md'),
-                    ButtonComponent(action=MessageAction(label="📋 查看本月支出明細", text="查詢最近支出"), style='secondary', height='sm'),
+                    ButtonComponent(action=MessageAction(label="👥 姐姐結帳專用：本月各人代墊彙整", text="各人代墊結算"), style='primary', color='#e63946', height='sm'),
+                    ButtonComponent(action=MessageAction(label="📋 查看本月支出流水帳", text="查詢最近支出"), style='secondary', height='sm', margin='xs'),
+                ])
+            ])
+        )
+    )
+
+# ==================== 3b. 月底姐姐結帳專用卡片 (各人代墊彙整) ====================
+def create_settlement_flex(month_str, member_expenses, total_expense):
+    member_boxes = []
+    # 5 位家人名單
+    family_members = ["黃志嘉", "黃志龍", "黃芊甄", "黃蕙芬", "塗雅芳"]
+    roles = {
+        "黃志嘉": "哥哥",
+        "黃志龍": "弟弟",
+        "黃芊甄": "姊姊",
+        "黃蕙芬": "妹妹",
+        "塗雅芳": "弟妹"
+    }
+
+    for name in family_members:
+        amt = member_expenses.get(name, 0)
+        role = roles.get(name, "")
+        color = '#e63946' if amt > 0 else '#888888'
+        weight = 'bold' if amt > 0 else 'regular'
+        member_boxes.append(create_row(f"👤 {role} {name}", f"{amt:,} 元", color=color, weight=weight))
+
+    # 檢查是否有其他代墊人
+    for name, amt in member_expenses.items():
+        if name not in family_members and amt > 0:
+            member_boxes.append(create_row(f"👤 {name}", f"{amt:,} 元", color='#e63946', weight='bold'))
+
+    return FlexSendMessage(
+        alt_text=f"【月底結算】爸爸照顧專戶 {month_str} 各人代墊款總表",
+        contents=BubbleContainer(
+            body=BoxComponent(layout='vertical', padding_all='none', contents=[
+                BoxComponent(layout='vertical', padding_all='lg', background_color='#e63946', contents=[
+                    TextComponent(text=f"🧾 月底結帳 ｜ {month_str} 各人代墊彙整", weight='bold', size='md', color='#ffffff'),
+                    TextComponent(text="方便黃芊甄(姊姊)月底統一撥款核銷", size='xs', color='#ffe3e3', margin='xs'),
+                ]),
+                BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
+                    TextComponent(text="💡 本月全家人代墊金額結算：", weight='bold', size='sm', color='#333333'),
+                    SeparatorComponent(margin='xs'),
+                    *member_boxes,
+                    SeparatorComponent(margin='md'),
+                    create_row("💵 本月應撥款總額", f"{total_expense:,} 元", color='#e63946', weight='bold'),
+                    SeparatorComponent(margin='md'),
+                    TextComponent(text="📌 說明：姊姊匯款後，該月代墊款即已由照顧專戶支應平帳。", size='xxs', color='#888888', wrap=True),
+                    ButtonComponent(action=MessageAction(label="📊 返回本月收支總表", text="本月收支總表"), style='secondary', height='sm', margin='sm'),
                 ])
             ])
         )
@@ -487,6 +535,42 @@ def handle_text_message(event):
         line_bot_api.reply_message(event.reply_token, create_summary_flex(
             month_str, total_income, total_expense, net_bal, categories,
             base_balance=base_balance, current_balance=current_balance
+        ))
+        return
+
+    # ── 3b. 姐姐月底結帳專用：各人代墊款彙整 ──
+    if text in ["各人代墊結算", "代墊結算", "結算代墊", "代墊款", "代墊", "各人代墊"]:
+        now = datetime.now()
+        month_str = f"{now.year}年{now.month}月"
+        ws_out = get_worksheet("支出明細")
+        out_rows = ws_out.get_all_values() if ws_out else []
+
+        cur_prefix = f"{now.year}/{now.month:02d}"
+        alt_prefix = f"{now.year}-{now.month:02d}"
+
+        member_expenses = {
+            "黃志嘉": 0,
+            "黃志龍": 0,
+            "黃芊甄": 0,
+            "黃蕙芬": 0,
+            "塗雅芳": 0
+        }
+        total_expense = 0
+
+        if out_rows and len(out_rows) > 1:
+            for r in out_rows[1:]:
+                d = r[1] if len(r) > 1 else ""
+                who = clean_user_name(r[2]) if len(r) > 2 else "其他"
+                amt = clean_num(r[5]) if len(r) > 5 else 0
+                if d.startswith(cur_prefix) or d.startswith(alt_prefix) or f"{now.month}月" in d:
+                    total_expense += amt
+                    if who in member_expenses:
+                        member_expenses[who] += amt
+                    else:
+                        member_expenses[who] = member_expenses.get(who, 0) + amt
+
+        line_bot_api.reply_message(event.reply_token, create_settlement_flex(
+            month_str, member_expenses, total_expense
         ))
         return
 
