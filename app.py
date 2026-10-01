@@ -76,7 +76,66 @@ def clean_num(val):
     s = re.sub(r'[^\d]', '', str(val).strip())
     return int(s) if s else 0
 
-# ==================== 家人名稱標準化 ====================
+# ==================== 家人 LINE ID 綁定與名稱標準化 ====================
+USER_BINDINGS_CACHE = {
+    "Uc63f60ac0469e5f5a684081e20814dff": {"name": "黃蕙芬", "role": "妹妹"}
+}
+
+def load_user_bindings():
+    try:
+        ws = get_worksheet("成員綁定")
+        if ws:
+            rows = ws.get_all_values()
+            if len(rows) > 1:
+                for r in rows[1:]:
+                    uid = r[0].strip() if len(r) > 0 else ""
+                    name = r[1].strip() if len(r) > 1 else ""
+                    role = r[2].strip() if len(r) > 2 else ""
+                    if uid and name:
+                        USER_BINDINGS_CACHE[uid] = {"name": name, "role": role}
+    except Exception as e:
+        print(f"載入成員綁定失敗: {e}")
+
+def get_user_name_by_id(user_id, display_name=""):
+    if user_id in USER_BINDINGS_CACHE:
+        return USER_BINDINGS_CACHE[user_id]["name"]
+    # 嘗試從快取讀取不到時更新一次
+    load_user_bindings()
+    if user_id in USER_BINDINGS_CACHE:
+        return USER_BINDINGS_CACHE[user_id]["name"]
+    return clean_user_name(display_name)
+
+def bind_user(user_id, target_name):
+    roles = {
+        "黃志嘉": "哥哥",
+        "黃志龍": "弟弟",
+        "黃芊甄": "姊姊",
+        "黃蕙芬": "妹妹",
+        "塗雅芳": "弟妹"
+    }
+    role = roles.get(target_name, "家人")
+    USER_BINDINGS_CACHE[user_id] = {"name": target_name, "role": role}
+    try:
+        ws = get_worksheet("成員綁定")
+        if ws:
+            now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            # 檢查是否已存在
+            rows = ws.get_all_values()
+            found_idx = -1
+            if len(rows) > 1:
+                for idx, r in enumerate(rows[1:], start=2):
+                    if len(r) > 0 and r[0].strip() == user_id:
+                        found_idx = idx
+                        break
+            if found_idx > 0:
+                ws.update(f"A{found_idx}:E{found_idx}", [[user_id, target_name, role, now_time, "手動重新綁定"]])
+            else:
+                ws.append_row([user_id, target_name, role, now_time, "LINE點選綁定"])
+            return True
+    except Exception as e:
+        print(f"綁定失敗: {e}")
+    return False
+
 def clean_user_name(name):
     if not name:
         return "家人"
@@ -91,6 +150,44 @@ def clean_user_name(name):
     if any(k in name for k in ["塗雅芳", "雅芳"]):
         return "塗雅芳"
     return name
+
+def create_binding_flex():
+    members = [
+        ("黃志龍", "弟弟", "#1d3557"),
+        ("塗雅芳", "弟妹", "#e63946"),
+        ("黃志嘉", "哥哥", "#457b9d"),
+        ("黃芊甄", "姊姊", "#2a9d8f"),
+        ("黃蕙芬", "妹妹", "#6a4c93")
+    ]
+    buttons = []
+    for name, role, color in members:
+        buttons.append(
+            ButtonComponent(
+                action=MessageAction(label=f"我是 {role}【{name}】", text=f"綁定身分 {name}"),
+                style='secondary',
+                height='sm',
+                margin='xs'
+            )
+        )
+
+    return FlexSendMessage(
+        alt_text="【爸爸照顧小秘書】請綁定您的家人身分",
+        contents=BubbleContainer(
+            body=BoxComponent(layout='vertical', padding_all='none', contents=[
+                BoxComponent(layout='vertical', padding_all='lg', background_color='#1d3557', contents=[
+                    TextComponent(text="👤 歡迎！請綁定您的家人身分", weight='bold', size='md', color='#ffffff'),
+                    TextComponent(text="僅需點選一次，永久綁定您的 LINE 帳號！", size='xs', color='#a8dadc', margin='xs'),
+                ]),
+                BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
+                    TextComponent(text="綁定後，您傳送語音或發票照片，系統將自動以您的名義精準入帳，姐姐月底結算零失誤：", size='xs', color='#555555', wrap=True),
+                    SeparatorComponent(margin='xs'),
+                    *buttons,
+                    SeparatorComponent(margin='sm'),
+                    TextComponent(text="💡 若點選錯誤，日後隨時輸入「綁定身分」即可更換！", size='xxs', color='#888888', wrap=True)
+                ])
+            ])
+        )
+    )
 
 # ==================== 建立列排版小工具 ====================
 def create_row(label, value, color='#333333', weight='regular'):
@@ -111,15 +208,17 @@ def create_expense_menu_flex():
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#e63946', contents=[
                     TextComponent(text="💰 爸爸照顧專戶 ｜ 記一筆支出", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="實報實銷、公開透明，大家辛苦了！", size='xs', color='#ffe3e3', margin='xs'),
+                    TextComponent(text="語音＋拍發票秒速入帳，不需開表單！", size='xs', color='#ffe3e3', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    TextComponent(text="🎙️ 推薦【語音輸入】秒記帳：", weight='bold', size='sm', color='#e63946'),
-                    SeparatorComponent(margin='xs'),
-                    TextComponent(text="在 LINE 直接說一句話即可自動入帳，例如：\n•「黃志龍買水果600元」\n•「黃志龍買尿布850」\n•「塗雅芳買便當240元」\n•「黃志嘉買午餐160」", size='xs', color='#333333', wrap=True),
+                    TextComponent(text="🎙️ 方式一：語音輸入（推薦）", weight='bold', size='sm', color='#e63946'),
+                    TextComponent(text="直接在對話框說話即可入帳：\n•「黃志龍買水果600元」\n•「塗雅芳買尿布850」\n•「黃志嘉買午餐160」", size='xs', color='#333333', wrap=True),
                     SeparatorComponent(margin='md'),
-                    ButtonComponent(action=URIAction(label="📝 線上詳細記帳表單", uri=f"{BASE_URL}/expense_form"), style='primary', color='#e63946', height='sm'),
-                    ButtonComponent(action=MessageAction(label="📋 查詢最近支出明細", text="查詢最近支出"), style='secondary', height='sm', margin='xs'),
+                    TextComponent(text="📸 方式二：隨手拍發票/收據", weight='bold', size='sm', color='#1d3557'),
+                    TextComponent(text="直接將發票或收據拍照傳送至對話框，系統自動依您的身分入帳！", size='xs', color='#555555', wrap=True),
+                    SeparatorComponent(margin='md'),
+                    ButtonComponent(action=MessageAction(label="📋 查詢最近支出明細", text="查詢最近支出"), style='primary', color='#e63946', height='sm'),
+                    ButtonComponent(action=MessageAction(label="👤 重新綁定我的身分", text="綁定身分"), style='secondary', height='sm', margin='xs'),
                 ])
             ])
         )
@@ -136,15 +235,14 @@ def create_income_menu_flex():
                     TextComponent(text="房租實收匯入與被動收益入帳核算", size='xs', color='#d8f3dc', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    TextComponent(text="💼 點擊快速登記或自填金額：", weight='bold', size='sm', color='#333333'),
+                    TextComponent(text="💼 點擊按鈕或直接輸入金額：", weight='bold', size='sm', color='#333333'),
                     SeparatorComponent(margin='xs'),
                     ButtonComponent(action=MessageAction(label="🏠 蕙芬 登記房租實收入帳", text="登記房租入帳"), style='primary', color='#2a9d8f', height='sm'),
                     ButtonComponent(action=MessageAction(label="🏛️ 芊甄 登記老人年金", text="登記老人年金"), style='secondary', height='sm', margin='xs'),
                     ButtonComponent(action=MessageAction(label="📈 芊甄 登記債券收益", text="登記債券收益"), style='secondary', height='sm', margin='xs'),
                     ButtonComponent(action=MessageAction(label="💰 芊甄 登記利息收入", text="登記利息收入"), style='secondary', height='sm', margin='xs'),
                     SeparatorComponent(margin='md'),
-                    TextComponent(text="💡 小提示：可直接輸入「房租 18500」、「老人年金 4164」或「債券 15000」直接入帳！", size='xs', color='#666666', wrap=True),
-                    ButtonComponent(action=URIAction(label="📝 線上自訂進項登記表單", uri=f"{BASE_URL}/income_form"), style='secondary', height='sm', margin='xs'),
+                    TextComponent(text="💡 小提示：直接輸入「房租 18500」或「老人年金 4164」即可直接入帳！", size='xxs', color='#666666', wrap=True),
                 ])
             ])
         )
@@ -440,9 +538,79 @@ def handle_text_message(event):
 
     try:
         profile = line_bot_api.get_profile(user_id)
-        user_name = clean_user_name(profile.display_name)
+        display_name = profile.display_name
     except Exception:
-        user_name = "家人"
+        display_name = "家人"
+
+    # 優先從綁定名單取得身分
+    user_name = get_user_name_by_id(user_id, display_name)
+
+    # ── 0. 身分綁定指令（手動觸發或點選卡片）──
+    if text in ["綁定身分", "身分綁定", "重新綁定", "我是誰"]:
+        line_bot_api.reply_message(event.reply_token, create_binding_flex())
+        return
+
+    if text.startswith("綁定身分 "):
+        target = text.replace("綁定身分", "").strip()
+        if target in ["黃志嘉", "黃志龍", "黃芊甄", "黃蕙芬", "塗雅芳"]:
+            bind_user(user_id, target)
+            roles = {"黃志嘉": "哥哥", "黃志龍": "弟弟", "黃芊甄": "姊姊", "黃蕙芬": "妹妹", "塗雅芳": "弟妹"}
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"🎉 身分綁定成功！\n\n已成功將您的 LINE 帳號綁定為：\n👉 {roles.get(target, '')}【{target}】\n\n今後您傳送語音或發票收據，系統將 100% 自動以您的名義入帳，姐姐月底結算精準零失誤！"
+            ))
+            return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="⚠️ 請選擇正確家人姓名：黃志嘉、黃志龍、黃芊甄、黃蕙芬、塗雅芳。"
+            ))
+            return
+
+    # ── 0b. 快速修改上一筆金額指令（例如「金額 800」或「金額改為 800」）──
+    if re.match(r'^(金額|金額改為|修改金額|改為)\s*\d+', text) or (text.startswith("金額") and any(c.isdigit() for c in text)):
+        m_amt = re.search(r'\d+', text)
+        if m_amt:
+            new_amt = int(m_amt.group())
+            ws_out = get_worksheet("支出明細")
+            if ws_out:
+                rows = ws_out.get_all_values()
+                if len(rows) > 1:
+                    last_idx = len(rows)
+                    last_row = rows[-1]
+                    old_amt = last_row[5] if len(last_row) > 5 else "0"
+                    old_item = last_row[4] if len(last_row) > 4 else "品項"
+                    old_spender = last_row[2] if len(last_row) > 2 else user_name
+                    # 更新第 6 欄 (F欄 金額)
+                    ws_out.update_cell(last_idx, 6, new_amt)
+                    ws_out.update_cell(last_idx, 8, f"已更正金額 (原{old_amt}元)")
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                        text=f"✏️ 【已成功更正上一筆金額！】\n• 代墊人：{old_spender}\n• 品項：{old_item}\n• 原金額：{old_amt} 元\n• 修正後金額：{new_amt:,} 元\n\n已同步更新至 Google 試算表！"
+                    ))
+                    return
+                else:
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前尚無支出記錄可供修改！"))
+                    return
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 目前試算表連線中，請稍候重試！"))
+                return
+
+    # ── 0c. 刪除上一筆指令 ──
+    if text in ["刪除上一筆", "刪除剛才那一筆", "取消上一筆"]:
+        ws_out = get_worksheet("支出明細")
+        if ws_out:
+            rows = ws_out.get_all_values()
+            if len(rows) > 1:
+                last_idx = len(rows)
+                last_row = rows[-1]
+                del_item = last_row[4] if len(last_row) > 4 else "品項"
+                del_amt = last_row[5] if len(last_row) > 5 else "0"
+                ws_out.delete_rows(last_idx)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"🗑️ 已為您刪除上一筆支出記錄：\n• 【{del_item} {del_amt}元】已自試算表中移除！"
+                ))
+                return
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前無支出記錄可刪除！"))
+                return
 
     # ── 1. 六宮格按鈕 1：記一筆支出 ──
     if text in ["記一筆支出", "記帳", "支出", "1", "按鈕1"]:
@@ -781,13 +949,24 @@ def handle_image_message(event):
     user_id = event.source.user_id
     try:
         profile = line_bot_api.get_profile(user_id)
-        user_name = clean_user_name(profile.display_name)
+        display_name = profile.display_name
     except:
-        user_name = "家人"
+        display_name = "家人"
 
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(
-        text=f"📸 收到 {user_name} 傳送的照片！\n\n• 若是【發票/收據報銷】：請直接接著用語音或文字回傳「品項與金額」（例如：`水果 600` 或 `尿布 850`），系統會立即為您完成記帳！\n\n• 若是【回診新藥袋/用藥照片】：請直接回傳藥名與服用時段（例如：`新陳代謝科血壓藥 早上飯後1顆`），系統會自動為您備查並收錄至用藥手冊！\n\n• 若是【生活日誌照片】：已存檔備查，感謝您的貼心照料！"
-    ))
+    user_name = get_user_name_by_id(user_id, display_name)
+
+    # 記錄一張發票/收據照片佔位記錄，方便直接補金額
+    today_str = datetime.now().strftime("%Y/%m/%d")
+    now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+
+    reply_text = f"📸 收到【{user_name}】傳送的照片！\n\n"
+    reply_text += "🧾 若是【發票/收據報銷】：\n"
+    reply_text += f"請直接回傳金額（例如：`850` 或 `尿布 850`），系統將自動以【{user_name}】名義入帳！\n\n"
+    reply_text += "💊 若是【回診新藥袋】：\n"
+    reply_text += "請回傳藥名與服用時段（例如：`血壓藥 早上飯後1顆`）即自動歸檔至用藥手冊！\n\n"
+    reply_text += "💡 小叮嚀：若身分顯示不對，可輸入「綁定身分」一鍵更新！"
+
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text.strip()))
 
 # ==================== Web 網頁表單 (記帳、進項、高醫回診、用藥、日誌) ====================
 
