@@ -272,17 +272,34 @@ def create_expense_menu_flex():
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#e63946', contents=[
                     TextComponent(text="💰 爸爸照顧專戶 ｜ 記一筆支出", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="語音＋拍發票秒速入帳，不需開表單！", size='xs', color='#ffe3e3', margin='xs'),
+                    TextComponent(text="實報實銷、公開透明，大家辛苦了！", size='xs', color='#ffe3e3', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    TextComponent(text="🎙️ 方式一：語音輸入（推薦）", weight='bold', size='sm', color='#e63946'),
-                    TextComponent(text="直接在對話框說話即可入帳：\n•「黃志龍買水果600元」\n•「塗雅芳買尿布850」\n•「黃志嘉買午餐160」", size='xs', color='#333333', wrap=True),
-                    SeparatorComponent(margin='md'),
-                    TextComponent(text="📸 方式二：隨手拍發票/收據", weight='bold', size='sm', color='#1d3557'),
-                    TextComponent(text="直接將發票或收據拍照傳送至對話框，系統自動依您的身分入帳！", size='xs', color='#555555', wrap=True),
-                    SeparatorComponent(margin='md'),
-                    ButtonComponent(action=MessageAction(label="📋 查詢最近支出明細", text="查詢最近支出"), style='primary', color='#e63946', height='sm'),
-                    ButtonComponent(action=MessageAction(label="👤 重新綁定我的身分", text="綁定身分"), style='secondary', height='sm', margin='xs'),
+                    TextComponent(text="請選擇記帳方式或確認身分：", weight='bold', size='xs', color='#555555'),
+                    SeparatorComponent(margin='xs'),
+                    # 按鍵 1：拍照上傳發票 (使用 line://nv/camera 快速調起手機相機拍照)
+                    ButtonComponent(
+                        action=URIAction(label="📸 拍照上傳發票", uri="line://nv/camera"),
+                        style='primary',
+                        color='#e63946',
+                        height='sm',
+                        margin='sm'
+                    ),
+                    # 按鍵 2：語音輸入花費金額
+                    ButtonComponent(
+                        action=MessageAction(label="🎙️ 語音輸入花費金額", text="語音記帳說明"),
+                        style='primary',
+                        color='#1d3557',
+                        height='sm',
+                        margin='sm'
+                    ),
+                    # 按鍵 3：綁定身分
+                    ButtonComponent(
+                        action=MessageAction(label="👤 綁定身分", text="綁定身分"),
+                        style='secondary',
+                        height='sm',
+                        margin='sm'
+                    ),
                 ])
             ])
         )
@@ -679,6 +696,18 @@ def handle_text_message(event):
     # ── 1. 六宮格按鈕 1：記一筆支出 ──
     if text in ["記一筆支出", "記帳", "支出", "1", "按鈕1"]:
         line_bot_api.reply_message(event.reply_token, create_expense_menu_flex())
+        return
+
+    # ── 1b. 語音記帳說明 ──
+    if text in ["語音記帳說明", "語音輸入花費金額", "語音輸入"]:
+        reply_msg = f"🎙️ 【語音記帳超簡單】\n\n"
+        reply_msg += f"您只要按住 LINE 麥克風說話（或直接打字）：\n"
+        reply_msg += f"👉 「買尿布 850」\n"
+        reply_msg += f"👉 「買水果 600」\n"
+        reply_msg += f"👉 「計程車 220」\n\n"
+        reply_msg += f"系統將自動依您的綁定身分【{user_name}】直接寫入 Google 試算表！\n"
+        reply_msg += f"（若幫其他家人代記，也可以說：「黃志龍買尿布850」）"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_msg))
         return
 
     # ── 2. 六宮格按鈕 2：專戶進項管理 ──
