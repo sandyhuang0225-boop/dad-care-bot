@@ -94,6 +94,11 @@ def analyze_receipt_with_gemini(image_bytes):
                 return {"amount": amt, "item": item, "category": cat}
     except Exception as e:
         print(f"Gemini 圖片辨識失敗: {e}")
+        try:
+            if hasattr(e, 'read'):
+                print(f"Gemini 錯誤詳情: {e.read().decode('utf-8')}")
+        except:
+            pass
     return None
 
 def get_gc():
@@ -1529,6 +1534,7 @@ def health():
         "status": "ok",
         "app": "dad_care_bot",
         "google_sheets_connected": sheet_ok,
+        "gemini_key_configured": bool(os.getenv("GEMINI_API_KEY")),
         "time": datetime.now().isoformat()
     })
 
