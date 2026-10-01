@@ -39,7 +39,11 @@ def get_gc():
         if creds_json:
             creds_dict = json.loads(creds_json)
             return gspread.service_account_from_dict(creds_dict)
-        # 2. 本地開發讀取 credentials.json
+        # 2. Render Secret File 預設路徑
+        secret_file = "/etc/secrets/credentials.json"
+        if os.path.exists(secret_file):
+            return gspread.service_account(secret_file)
+        # 3. 本地開發讀取 credentials.json
         if os.path.exists(CREDENTIALS_FILE):
             return gspread.service_account(CREDENTIALS_FILE)
     except Exception as e:
@@ -1060,7 +1064,20 @@ def log_form():
 
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok", "app": "dad_care_bot", "time": datetime.now().isoformat()})
+    gc = get_gc()
+    sheet_ok = False
+    if gc:
+        try:
+            sh = gc.open(SPREADSHEET_NAME)
+            sheet_ok = bool(sh)
+        except Exception:
+            sheet_ok = False
+    return jsonify({
+        "status": "ok",
+        "app": "dad_care_bot",
+        "google_sheets_connected": sheet_ok,
+        "time": datetime.now().isoformat()
+    })
 
 app.app = app
 
