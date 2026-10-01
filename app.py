@@ -43,17 +43,30 @@ def analyze_receipt_with_gemini(image_bytes):
     try:
         b64_img = base64.b64encode(image_bytes).decode('utf-8')
         prompt = """
-你是一個專業的發票與收據辨識助手。請仔細分析這張照片（發票、收據、明細單或購物清單）：
-1. 找出購買的品項摘要（例如：成人尿布、水果、生活用品、藥品、便當等，簡明扼要，10字以內）。
-2. 找出最關鍵的「最終總金額」或「實付金額」（注意：必須是整數數字，單位為元，若有多個金額請找出合計/總計/TOTAL）。
-3. 判斷費用分類，只能從以下 5 選 1：
-   - 伙食餐飲 (食物、飲料、水果、外食)
-   - 生活耗品 (尿布、紙巾、沐浴、衛生紙、日常消耗品)
-   - 醫療藥費 (藥局、掛號、門診、藥品)
-   - 交通接送 (計程車、油資、車資)
-   - 日常雜支 (其他)
+你是一個專精於台灣各類發票與收據的超高準確率視覺辨識 AI 專家。
+面對可能有些微晃動、模糊、光影或折痕的照片，請遵循以下【台灣發票結構判讀法則】進行深度分析：
 
-請嚴格只輸出 JSON 格式，不要有任何額外的文字或 markdown 標籤：
+【重要：金額判讀法則】
+1. 尋找「最終實付總金額」：
+   - 台灣傳統或電子發票、全聯/家樂福/大樹藥局/超商明細單上，請優先鎖定標有【總計】、【合計】、【實收】、【實付】、【應付金額】、【TOTAL】旁邊的數字。
+   - 通常位於發票中下段，字體最大、最粗，或帶有粗黑框線。
+2. 絕對要排除的干擾數字（千萬不要誤判為總金額）：
+   - 排除：課稅別（如 TX, 1, 0）、數量（如 1, 2）、單價、序號、折扣金額。
+   - 排除：應稅銷售額、營業稅（如 5%）、零稅率、免稅。
+   - 排除：發票號碼（如 AB-12345678）、日期時間、隨機碼、找零金額。
+3. 交叉比對驗證：
+   - 如果照片模糊，請觀察發票上的購買明細清單，將購買項目的金額進行心算相加，對照是否與辨識出的「總計」相符，以確保金額百分之百精確！
+
+【品項與分類判讀】
+1. 品項名稱：請挑選 1~2 個主要購買的代表性商品（如：成人尿布、水果、衛生紙、血壓藥、午餐等，10字以內），不要把商品編號放進去。
+2. 分類嚴格 5 選 1：
+   - 伙食餐飲 (蔬菜水果、便當餐點、飲料食物)
+   - 生活耗品 (尿布、濕紙巾、衛生紙、沐浴乳、清潔用品、看護耗品)
+   - 醫療藥費 (藥局買藥、高醫門診掛號費、醫療器材)
+   - 交通接送 (計程車、加油、高鐵捷運)
+   - 日常雜支 (其他雜支)
+
+請嚴格只輸出 JSON 格式，絕對不要包含任何 markdown 標籤或額外文字：
 {"item": "品項名稱", "amount": 850, "category": "生活耗品"}
 """
         req_body = {
@@ -652,8 +665,11 @@ def handle_text_message(event):
             ))
             return
 
-    # ── 0b. 快速修改上一筆金額指令（例如「金額 800」或「金額改為 800」）──
-    if re.match(r'^(金額|金額改為|修改金額|改為)\s*\d+', text) or (text.startswith("金額") and any(c.isdigit() for c in text)):
+    # ── 0b. 快速修改上一筆金額指令（例如「850」、「850元」、「金額 800」或「改為 800」）──
+    is_pure_num = bool(re.match(r'^\d+\s*(元|塊)?$', text))
+    is_modify_cmd = bool(re.match(r'^(金額|金額改為|修改金額|改為)\s*\d+', text) or (text.startswith("金額") and any(c.isdigit() for c in text)))
+
+    if is_modify_cmd or (is_pure_num and len(text) <= 7):
         m_amt = re.search(r'\d+', text)
         if m_amt:
             new_amt = int(m_amt.group())
@@ -670,7 +686,7 @@ def handle_text_message(event):
                     ws_out.update_cell(last_idx, 6, new_amt)
                     ws_out.update_cell(last_idx, 8, f"已更正金額 (原{old_amt}元)")
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                        text=f"✏️ 【已成功更正上一筆金額！】\n• 代墊人：{old_spender}\n• 品項：{old_item}\n• 原金額：{old_amt} 元\n• 修正後金額：{new_amt:,} 元\n\n已同步更新至 Google 試算表！"
+                        text=f"✏️ 【已成功更正金額！】\n• 代墊人：{old_spender}\n• 品項：{old_item}\n• 原金額：{old_amt} 元\n• 修正後金額：{new_amt:,} 元\n\n已同步更新至 Google 試算表！"
                     ))
                     return
                 else:
