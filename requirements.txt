@@ -1,0 +1,4 @@
+flask>=2.0.0
+line-bot-sdk>=2.4.0
+gspread>=5.0.0
+gunicorn>=20.1.0
