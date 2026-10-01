@@ -151,7 +151,7 @@ def create_income_menu_flex():
     )
 
 # ==================== 3. 本月收支總表卡片 ====================
-def create_summary_flex(month_str, total_income, total_expense, net_balance, category_breakdown):
+def create_summary_flex(month_str, total_income, total_expense, net_balance, category_breakdown, base_balance=635008, current_balance=635008):
     net_color = '#2a9d8f' if net_balance >= 0 else '#e63946'
     net_sign = "+" if net_balance > 0 else ""
     cat_boxes = []
@@ -164,14 +164,25 @@ def create_summary_flex(month_str, total_income, total_expense, net_balance, cat
         contents=BubbleContainer(
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#1d3557', contents=[
-                    TextComponent(text=f"📊 照顧專戶 ｜ {month_str} 收支月報", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="即時自動統計，全體兄弟姊妹公開透明", size='xs', color='#a8dadc', margin='xs'),
+                    TextComponent(text=f"📊 照顧專戶 ｜ {month_str} 財務總表", weight='bold', size='md', color='#ffffff'),
+                    TextComponent(text="自動扣抵月收支，解放雙手、公開透明", size='xs', color='#a8dadc', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    create_row("🟢 本月進項總額", f"{total_income:,} 元", color='#2a9d8f', weight='bold'),
-                    create_row("🔴 本月支出總額", f"{total_expense:,} 元", color='#e63946', weight='bold'),
-                    SeparatorComponent(margin='sm'),
-                    create_row("💵 本月收支淨結餘", f"{net_sign}{net_balance:,} 元", color=net_color, weight='bold'),
+                    BoxComponent(
+                        layout='vertical',
+                        background_color='#f1faee',
+                        padding_all='md',
+                        corner_radius='md',
+                        contents=[
+                            TextComponent(text="💰 爸爸照顧專戶目前總餘額", size='xs', color='#457b9d', weight='bold'),
+                            TextComponent(text=f"${current_balance:,} 元", size='xl', color='#1d3557', weight='bold', margin='xs'),
+                            TextComponent(text=f"基準結餘：${base_balance:,} 元 (姐姐10/1結算)", size='xxs', color='#888888', margin='xs')
+                        ]
+                    ),
+                    SeparatorComponent(margin='md'),
+                    create_row("🟢 本月進項總額", f"+{total_income:,} 元", color='#2a9d8f', weight='bold'),
+                    create_row("🔴 本月支出總額", f"-{total_expense:,} 元", color='#e63946', weight='bold'),
+                    create_row("💵 本月收支淨差額", f"{net_sign}{net_balance:,} 元", color=net_color, weight='bold'),
                     SeparatorComponent(margin='md'),
                     TextComponent(text="📑 本月主要支出項目：", weight='bold', size='xs', color='#555555', margin='sm'),
                     *(cat_boxes if cat_boxes else [TextComponent(text="目前尚無支出記錄", size='xs', color='#999999')]),
@@ -434,9 +445,48 @@ def handle_text_message(event):
                     if not found:
                         categories["日常雜支"] += amt
 
+        # 讀取「收支總表」中的基準金額 (例如姐姐10/1結算的 635,008 元)
+        ws_sum = get_worksheet("收支總表")
+        base_balance = 635008
+        if ws_sum:
+            sum_rows = ws_sum.get_all_values()
+            if len(sum_rows) > 1:
+                # 尋找基準結餘
+                for sr in sum_rows[1:]:
+                    bal = clean_num(sr[4]) if len(sr) > 4 else 0
+                    if bal > 0:
+                        base_balance = bal
+                        break
+
         net_bal = total_income - total_expense
+        current_balance = base_balance + net_bal
+
+        # 自動回寫/同步更新「收支總表」工作表當前月份資料
+        if ws_sum:
+            try:
+                # 若已有當月，更新之；若無則新增
+                sum_rows = ws_sum.get_all_values()
+                found_idx = -1
+                for idx, sr in enumerate(sum_rows[1:], start=2):
+                    if len(sr) > 0 and (month_str in sr[0] or f"{now.year}/{now.month:02d}" in sr[0]):
+                        found_idx = idx
+                        break
+                if found_idx > 0:
+                    ws_sum.update(f"A{found_idx}:F{found_idx}", [[
+                        month_str, total_income, total_expense, net_bal, current_balance,
+                        f"自動結算 (基準635,008 + 進項{total_income} - 支出{total_expense})"
+                    ]])
+                else:
+                    ws_sum.append_row([
+                        month_str, total_income, total_expense, net_bal, current_balance,
+                        f"自動結算 (基準635,008 + 進項{total_income} - 支出{total_expense})"
+                    ])
+            except Exception as e:
+                print(f"同步收支總表失敗: {e}")
+
         line_bot_api.reply_message(event.reply_token, create_summary_flex(
-            month_str, total_income, total_expense, net_bal, categories
+            month_str, total_income, total_expense, net_bal, categories,
+            base_balance=base_balance, current_balance=current_balance
         ))
         return
 
@@ -591,9 +641,30 @@ def handle_text_message(event):
                     text=f"✅ 已成功登記利息收入！\n• 登記人：黃芊甄\n• 項目：銀行利息\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
                 ))
             return
-        else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💰 請輸入銀行利息金額，例如：`利息 250`！"))
+    # ── 8b. 設定/更新專戶結算基準總額（例如姊姊輸入：設定總額 635008）──
+    if "設定總額" in text or "更新總額" in text or "結算總額" in text:
+        match = re.search(r'\d+', text)
+        if match:
+            new_base = int(match.group())
+            today_str = datetime.now().strftime("%Y/%m/%d")
+            now = datetime.now()
+            month_str = f"{now.year}年{now.month}月"
+            ws_sum = get_worksheet("收支總表")
+            if ws_sum:
+                ws_sum.append_row([
+                    month_str, 0, 0, 0, new_base,
+                    f"{user_name}於 {today_str} 設定/結算專戶基準總額 {new_base:,} 元"
+                ])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✅ 已成功更新照顧專戶結算基準總額！\n• 設定人：{user_name}\n• 專戶基準總額：{new_base:,} 元\n• 結算日期：{today_str}\n\n今後所有新增的進項與支出，都會以此總額為基準自動增減結餘！"
+                ))
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 目前試算表連線中，請稍候重試！"))
             return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💰 請輸入欲設定的帳戶總額，例如：`設定總額 635008`！"))
+            return
+
 
     # ── 9. 強大語音輸入記帳辨識（例如：「黃志龍買水果600元」）──
     expense_data = parse_voice_expense(text, user_name)
