@@ -75,31 +75,32 @@ def analyze_receipt_with_gemini(image_bytes):
                 "response_mime_type": "application/json"
             }
         }
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(req_body).encode('utf-8'),
-            headers={'Content-Type': 'application/json'}
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            res_data = json.loads(resp.read().decode('utf-8'))
-            candidates = res_data.get("candidates", [])
-            if candidates:
-                text_out = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                text_out = re.sub(r'```json\s*|\s*```', '', text_out).strip()
-                data = json.loads(text_out)
-                amt = int(data.get("amount", 0))
-                item = str(data.get("item", "日常採買")).strip()
-                cat = str(data.get("category", "日常雜支")).strip()
-                return {"amount": amt, "item": item, "category": cat}
+        models_to_try = ["gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview", "gemini-flash-latest"]
+        for m in models_to_try:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={GEMINI_API_KEY}"
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(req_body).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'}
+                )
+                with urllib.request.urlopen(req, timeout=12) as resp:
+                    res_data = json.loads(resp.read().decode('utf-8'))
+                    candidates = res_data.get("candidates", [])
+                    if candidates:
+                        text_out = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        text_out = re.sub(r'```json\s*|\s*```', '', text_out).strip()
+                        data = json.loads(text_out)
+                        amt = int(data.get("amount", 0))
+                        item = str(data.get("item", "日常採買")).strip()
+                        cat = str(data.get("category", "日常雜支")).strip()
+                        if amt > 0:
+                            return {"amount": amt, "item": item, "category": cat}
+            except Exception as ex_m:
+                print(f"嘗試模型 {m} 失敗: {ex_m}")
+                continue
     except Exception as e:
         print(f"Gemini 圖片辨識失敗: {e}")
-        try:
-            if hasattr(e, 'read'):
-                print(f"Gemini 錯誤詳情: {e.read().decode('utf-8')}")
-        except:
-            pass
-    return None
 
 def get_gc():
     try:
