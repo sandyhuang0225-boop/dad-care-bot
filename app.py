@@ -72,19 +72,20 @@ def clean_num(val):
     s = re.sub(r'[^\d]', '', str(val).strip())
     return int(s) if s else 0
 
+# ==================== 家人名稱標準化 ====================
 def clean_user_name(name):
     if not name:
         return "家人"
-    if any(k in name for k in ["Sandy", "sandy", "先迪"]):
-        return "Sandy"
-    if any(k in name for k in ["士龍", "弟弟", "建宏"]):
-        return "黃士龍"
-    if any(k in name for k in ["弟妹", "小芳"]):
-        return "弟妹"
-    if any(k in name for k in ["惠芬", "姊姊", "姐姐"]):
-        return "姊姊"
-    if "諾華" in name:
-        return "Sandy"
+    if any(k in name for k in ["黃志嘉", "志嘉"]):
+        return "黃志嘉"
+    if any(k in name for k in ["黃志龍", "志龍"]):
+        return "黃志龍"
+    if any(k in name for k in ["黃芊甄", "芊甄"]):
+        return "黃芊甄"
+    if any(k in name for k in ["黃蕙芬", "蕙芬", "Sandy", "sandy", "先迪", "諾華"]):
+        return "黃蕙芬"
+    if any(k in name for k in ["塗雅芳", "雅芳"]):
+        return "塗雅芳"
     return name
 
 # ==================== 建立列排版小工具 ====================
@@ -111,7 +112,7 @@ def create_expense_menu_flex():
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
                     TextComponent(text="🎙️ 推薦【語音輸入】秒記帳：", weight='bold', size='sm', color='#e63946'),
                     SeparatorComponent(margin='xs'),
-                    TextComponent(text="用 LINE 語音輸入說一句話即可自動記帳，例如：\n•「黃士龍買水果600元」\n•「買尿布850」\n•「士龍買午餐160」", size='xs', color='#333333', wrap=True),
+                    TextComponent(text="在 LINE 直接說一句話即可自動入帳，例如：\n•「黃志龍買水果600元」\n•「黃志龍買尿布850」\n•「塗雅芳買便當240元」\n•「黃志嘉買午餐160」", size='xs', color='#333333', wrap=True),
                     SeparatorComponent(margin='md'),
                     ButtonComponent(action=URIAction(label="📝 線上詳細記帳表單", uri=f"{BASE_URL}/expense_form"), style='primary', color='#e63946', height='sm'),
                     ButtonComponent(action=MessageAction(label="📋 查詢最近支出明細", text="查詢最近支出"), style='secondary', height='sm', margin='xs'),
@@ -128,17 +129,17 @@ def create_income_menu_flex():
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#2a9d8f', contents=[
                     TextComponent(text="🏠 爸爸照顧專戶 ｜ 進項管理", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="房租匯入與被動收益入帳核算", size='xs', color='#d8f3dc', margin='xs'),
+                    TextComponent(text="房租實收匯入與被動收益入帳核算", size='xs', color='#d8f3dc', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    TextComponent(text="💼 點擊快速登記或文字輸入：", weight='bold', size='sm', color='#333333'),
+                    TextComponent(text="💼 點擊快速登記或自填金額：", weight='bold', size='sm', color='#333333'),
                     SeparatorComponent(margin='xs'),
-                    ButtonComponent(action=MessageAction(label="🏠 Sandy 登記本月房租入帳", text="登記房租入帳 20000"), style='primary', color='#2a9d8f', height='sm'),
-                    ButtonComponent(action=MessageAction(label="🏛️ 姊姊登記老人年金", text="登記老人年金"), style='secondary', height='sm', margin='xs'),
-                    ButtonComponent(action=MessageAction(label="📈 姊姊登記債券收益", text="登記債券收益"), style='secondary', height='sm', margin='xs'),
-                    ButtonComponent(action=MessageAction(label="💰 姊姊登記利息收入", text="登記利息收入"), style='secondary', height='sm', margin='xs'),
+                    ButtonComponent(action=MessageAction(label="🏠 蕙芬 登記房租實收入帳", text="登記房租入帳"), style='primary', color='#2a9d8f', height='sm'),
+                    ButtonComponent(action=MessageAction(label="🏛️ 芊甄 登記老人年金", text="登記老人年金"), style='secondary', height='sm', margin='xs'),
+                    ButtonComponent(action=MessageAction(label="📈 芊甄 登記債券收益", text="登記債券收益"), style='secondary', height='sm', margin='xs'),
+                    ButtonComponent(action=MessageAction(label="💰 芊甄 登記利息收入", text="登記利息收入"), style='secondary', height='sm', margin='xs'),
                     SeparatorComponent(margin='md'),
-                    TextComponent(text="💡 小提示：也可直接傳送文字，例如「老人年金 4164」或「債券 15000」！", size='xs', color='#666666', wrap=True),
+                    TextComponent(text="💡 小提示：可直接輸入「房租 18500」、「老人年金 4164」或「債券 15000」直接入帳！", size='xs', color='#666666', wrap=True),
                     ButtonComponent(action=URIAction(label="📝 線上自訂進項登記表單", uri=f"{BASE_URL}/income_form"), style='secondary', height='sm', margin='xs'),
                 ])
             ])
@@ -197,7 +198,7 @@ def create_clinic_flex(clinic_rows):
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#457b9d', contents=[
                     TextComponent(text="🏥 爸爸健康 ｜ 高醫回診與慢箋", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="高醫神經內科、新陳代謝科就醫規劃", size='xs', color='#f1faee', margin='xs'),
+                    TextComponent(text="神經內科(失智) ＆ 新陳代謝科(血糖/血壓)", size='xs', color='#f1faee', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
                     TextComponent(text="🗓️ 近期回診排程：", weight='bold', size='sm', color='#333333'),
@@ -222,8 +223,7 @@ def create_medication_flex(med_rows):
             meal   = r[4] if len(r) > 4 else ""
             med_boxes.append(create_row(f"💊 {name}", f"{timing} ({meal})"))
     else:
-        # 內建神經內科與新陳代謝科 Baseline
-        med_boxes.append(create_row("💊 憶思能 (Exelon)", "早上隨餐 (認知失智)"))
+        med_boxes.append(create_row("💊 憶思能 (Exelon)", "早上隨餐 (失智認知)"))
         med_boxes.append(create_row("💊 庫魯化錠 (Glucophage)", "早晚飯後 (血糖控制)"))
         med_boxes.append(create_row("💊 脈優錠 (Norvasc)", "早上飯後 (血壓控制)"))
         med_boxes.append(create_row("💊 悠樂丁 (Eurodin)", "睡前半顆 (夜間舒眠)"))
@@ -234,15 +234,15 @@ def create_medication_flex(med_rows):
             body=BoxComponent(layout='vertical', padding_all='none', contents=[
                 BoxComponent(layout='vertical', padding_all='lg', background_color='#6a4c93', contents=[
                     TextComponent(text="💊 爸爸用藥 ｜ 現行用藥手冊", weight='bold', size='md', color='#ffffff'),
-                    TextComponent(text="高醫神經內科與新陳代謝科 Baseline", size='xs', color='#f3e8ee', margin='xs'),
+                    TextComponent(text="高醫神經內科與新陳代謝科現行用藥", size='xs', color='#f3e8ee', margin='xs'),
                 ]),
                 BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
-                    TextComponent(text="📋 每日規律服用藥品清單：", weight='bold', size='sm', color='#333333'),
+                    TextComponent(text="📋 每日固定服用藥品清單：", weight='bold', size='sm', color='#333333'),
                     SeparatorComponent(margin='xs'),
                     *med_boxes,
                     SeparatorComponent(margin='md'),
-                    TextComponent(text="💡 陪病看診必備：就診他科或牙科時，直接出示此畫面供醫師評估藥物交互作用！", size='xs', color='#666666', wrap=True),
-                    ButtonComponent(action=URIAction(label="✏️ 維護 / 新增現行用藥清單", uri=f"{BASE_URL}/med_form"), style='secondary', height='sm', margin='xs'),
+                    TextComponent(text="💡 新增方式：\n1. 拍新藥袋直接傳送至此對話框！\n2. 點擊下方線上表單填寫登記！", size='xs', color='#666666', wrap=True),
+                    ButtonComponent(action=URIAction(label="✏️ 線上表單新增/維護用藥", uri=f"{BASE_URL}/med_form"), style='secondary', height='sm', margin='xs'),
                 ])
             ])
         )
@@ -285,9 +285,11 @@ def create_care_log_flex(log_rows):
 def parse_voice_expense(text, sender_name):
     """
     解析語音輸入轉文字：
-    '黃士龍買水果600元'
-    '黃士龍 買水果 600'
-    '士龍買尿布850'
+    '黃志龍買水果600元'
+    '黃志龍 買水果 600'
+    '志龍買尿布850'
+    '塗雅芳買便當240元'
+    '黃志嘉買午餐160'
     '買水果600元'
     '午餐160'
     """
@@ -312,24 +314,24 @@ def parse_voice_expense(text, sender_name):
     if amount <= 0:
         return None
 
-    # 判斷支出人
+    # 判斷支出人（精準對齊 5 位家人）
     spender = clean_user_name(sender_name)
     rem_text = raw
-    if any(k in raw for k in ["黃士龍", "士龍"]):
-        spender = "黃士龍"
-        rem_text = re.sub(r'黃士龍|士龍', '', rem_text)
-    elif any(k in raw for k in ["弟妹", "小芳"]):
-        spender = "弟妹"
-        rem_text = re.sub(r'弟妹|小芳', '', rem_text)
-    elif any(k in raw for k in ["姊姊", "姐姐", "惠芬"]):
-        spender = "姊姊"
-        rem_text = re.sub(r'姊姊|姐姐|惠芬', '', rem_text)
-    elif any(k in raw for k in ["Sandy", "sandy", "先迪"]):
-        spender = "Sandy"
-        rem_text = re.sub(r'Sandy|sandy|先迪', '', rem_text)
-    elif "弟弟" in raw:
-        spender = "黃士龍"
-        rem_text = re.sub(r'弟弟', '', rem_text)
+    if any(k in raw for k in ["黃志嘉", "志嘉", "哥哥", "大哥"]):
+        spender = "黃志嘉"
+        rem_text = re.sub(r'黃志嘉|志嘉|哥哥|大哥', '', rem_text)
+    elif any(k in raw for k in ["黃志龍", "志龍", "弟弟", "阿龍"]):
+        spender = "黃志龍"
+        rem_text = re.sub(r'黃志龍|志龍|弟弟|阿龍', '', rem_text)
+    elif any(k in raw for k in ["黃芊甄", "芊甄", "姊姊", "姐姐", "大姊", "大姐"]):
+        spender = "黃芊甄"
+        rem_text = re.sub(r'黃芊甄|芊甄|姊姊|姐姐|大姊|大姐', '', rem_text)
+    elif any(k in raw for k in ["黃蕙芬", "蕙芬", "Sandy", "sandy", "先迪", "妹妹", "小妹"]):
+        spender = "黃蕙芬"
+        rem_text = re.sub(r'黃蕙芬|蕙芬|Sandy|sandy|先迪|妹妹|小妹', '', rem_text)
+    elif any(k in raw for k in ["塗雅芳", "雅芳", "弟妹"]):
+        spender = "塗雅芳"
+        rem_text = re.sub(r'塗雅芳|雅芳|弟妹', '', rem_text)
 
     # 抽取品項
     if num_str_matched:
@@ -411,11 +413,11 @@ def handle_text_message(event):
                     total_income += amt
 
         total_expense = 0
-        categories = {"伙食餐飲": 0, "生活耗品": 0, "醫療藥費": 0, "交通接送": 0, "其他雜支": 0}
+        categories = {"伙食餐飲": 0, "生活耗品": 0, "醫療藥費": 0, "交通接送": 0, "日常雜支": 0}
         if out_rows and len(out_rows) > 1:
             for r in out_rows[1:]:
                 d = r[1] if len(r) > 1 else ""
-                cat = r[3] if len(r) > 3 else "其他雜支"
+                cat = r[3] if len(r) > 3 else "日常雜支"
                 amt = clean_num(r[5]) if len(r) > 5 else 0
                 if d.startswith(cur_prefix) or d.startswith(alt_prefix) or f"{now.month}月" in d:
                     total_expense += amt
@@ -426,7 +428,7 @@ def handle_text_message(event):
                             found = True
                             break
                     if not found:
-                        categories["其他雜支"] += amt
+                        categories["日常雜支"] += amt
 
         net_bal = total_income - total_expense
         line_bot_api.reply_message(event.reply_token, create_summary_flex(
@@ -446,8 +448,8 @@ def handle_text_message(event):
     if any(k in text for k in ["慢箋", "慢性處方箋", "領藥區間"]):
         msg = "💊 【高醫 慢性病連續處方箋領藥叮嚀】\n\n"
         msg += "• 就診醫院：高雄醫學大學附設醫院（高醫）\n"
-        msg += "• 照護科別：神經內科、新陳代謝科\n"
-        msg += "• 領藥地點：住家鄰近健保特約藥局（如大樹藥局）或高醫領藥處\n"
+        msg += "• 照護科別：神經內科 (失智認知) ＆ 新陳代謝科 (血糖/血壓)\n"
+        msg += "• 領藥地點：住家鄰近健保藥局（如大樹藥局）或高醫領藥處\n"
         msg += "• 必備證件：爸爸健保卡正本 ＋ 慢箋紙本第二/三次聯\n"
         msg += "• 叮嚀事項：慢箋有效領藥期間為上次領藥後 28~30 天起，請留意藥袋標示日期！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
@@ -487,83 +489,109 @@ def handle_text_message(event):
             msg += f"\n💡 點擊【本月收支總表】可看即時月結餘！"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg.strip()))
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前尚無支出紀錄，歡迎用語音記帳（如「黃士龍買水果600元」）！"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="目前尚無支出紀錄，歡迎用語音記帳（如「黃志龍買水果600元」）！"))
         return
 
-    # ── 8. 專戶進項快捷指令 ──
-    if "登記房租" in text or text.startswith("房租"):
+    # ── 8. 專戶進項管理（房租實收、老人年金、債券、利息）──
+    if text in ["登記房租入帳", "登記房租"]:
+        msg = "🏠 【登記本月房屋租金實收淨額】\n\n"
+        msg += "因每月可能有修繕支出或扣繳管理費，請直接輸入扣除後的實收金額，例如輸入：\n"
+        msg += "👉 `房租 18500` 或 `房租 20000`\n\n"
+        msg += "系統將以黃蕙芬名義自動記錄至進項明細！"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        return
+
+    if "房租" in text:
         match = re.search(r'\d+', text)
-        amt = int(match.group()) if match else 20000
-        today_str = datetime.now().strftime("%Y/%m/%d")
-        now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        ws = get_worksheet("進項明細")
-        if ws:
-            ws.append_row([now_time, today_str, "Sandy", "房屋租金", f"{datetime.now().month}月份房屋租金", amt, "快捷登記"])
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✅ 已成功登記本月房租入帳！\n• 登記人：Sandy\n• 項目：房屋租金\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已自動歸入專戶總額！"
-            ))
+        if match:
+            amt = int(match.group())
+            today_str = datetime.now().strftime("%Y/%m/%d")
+            now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            ws = get_worksheet("進項明細")
+            if ws:
+                ws.append_row([now_time, today_str, "黃蕙芬", "房屋租金", f"{datetime.now().month}月份房屋租金(實收淨額)", amt, "實收淨額登記"])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✅ 已成功登記本月房租淨額！\n• 登記人：黃蕙芬\n• 項目：房屋租金實收\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已自動歸入專戶總額！"
+                ))
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 目前試算表連線中，請稍候重試！"))
+            return
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 目前試算表連線中，請稍候重試或確認 Google 授權！"))
-        return
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="🏠 請輸入扣除修繕與管理費後的實收房租金額，例如輸入：`房租 18500`！"
+            ))
+            return
 
-    if text == "登記老人年金":
+    if text in ["登記老人年金", "老人年金入帳"]:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(
-            text="🏛️ 請回傳老人年金入帳金額（例如直接輸入：`老人年金 4164`），系統將自動為姊姊入帳！"
+            text="🏛️ 請回傳老人年金實收金額（例如直接輸入：`老人年金 4164`），系統將以黃芊甄(姊姊)名義自動入帳！"
         ))
         return
 
     if "老人年金" in text:
         match = re.search(r'\d+', text)
-        amt = int(match.group()) if match else 4164
-        today_str = datetime.now().strftime("%Y/%m/%d")
-        now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        ws = get_worksheet("進項明細")
-        if ws:
-            ws.append_row([now_time, today_str, "姊姊", "政府津貼", f"{datetime.now().month}月份老人年金", amt, "網銀核對登記"])
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✅ 已成功登記老人年金入帳！\n• 登記人：姊姊\n• 項目：政府津貼(老人年金)\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶本月總收入！"
-            ))
-        return
+        if match:
+            amt = int(match.group())
+            today_str = datetime.now().strftime("%Y/%m/%d")
+            now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            ws = get_worksheet("進項明細")
+            if ws:
+                ws.append_row([now_time, today_str, "黃芊甄", "政府津貼", f"{datetime.now().month}月份老人年金", amt, "網銀核對登記"])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✅ 已成功登記老人年金入帳！\n• 登記人：黃芊甄\n• 項目：政府津貼(老人年金)\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶本月總收入！"
+                ))
+            return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🏛️ 請輸入本月老人年金金額，例如：`老人年金 4164`！"))
+            return
 
-    if text == "登記債券收益":
+    if text in ["登記債券收益", "登記債券"]:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(
-            text="📈 請回傳本季債券配息金額（例如直接輸入：`債券 15000`），系統將自動為姊姊入帳！"
+            text="📈 請回傳本期債券配息金額（例如直接輸入：`債券 15000`），系統將以黃芊甄(姊姊)名義自動入帳！"
         ))
         return
 
     if "債券" in text:
         match = re.search(r'\d+', text)
-        amt = int(match.group()) if match else 15000
-        today_str = datetime.now().strftime("%Y/%m/%d")
-        now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        ws = get_worksheet("進項明細")
-        if ws:
-            ws.append_row([now_time, today_str, "姊姊", "債券收益", "債券利息收益", amt, "網銀核對登記"])
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✅ 已成功登記債券收益入帳！\n• 登記人：姊姊\n• 項目：債券收益\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
-            ))
-        return
+        if match:
+            amt = int(match.group())
+            today_str = datetime.now().strftime("%Y/%m/%d")
+            now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            ws = get_worksheet("進項明細")
+            if ws:
+                ws.append_row([now_time, today_str, "黃芊甄", "債券收益", "債券利息配息收益", amt, "網銀核對登記"])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✅ 已成功登記債券收益入帳！\n• 登記人：黃芊甄\n• 項目：債券配息收益\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
+                ))
+            return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📈 請輸入本期債券配息金額，例如：`債券 15000`！"))
+            return
 
-    if text == "登記利息收入":
+    if text in ["登記利息收入", "登記利息"]:
         line_bot_api.reply_message(event.reply_token, TextSendMessage(
-            text="💰 請回傳銀行利息金額（例如直接輸入：`利息 250`），系統將自動為姊姊入帳！"
+            text="💰 請回傳銀行存款利息金額（例如直接輸入：`利息 250`），系統將以黃芊甄(姊姊)名義自動入帳！"
         ))
         return
 
     if "利息" in text:
         match = re.search(r'\d+', text)
-        amt = int(match.group()) if match else 250
-        today_str = datetime.now().strftime("%Y/%m/%d")
-        now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
-        ws = get_worksheet("進項明細")
-        if ws:
-            ws.append_row([now_time, today_str, "姊姊", "存款利息", "銀行存款利息", amt, "網銀核對登記"])
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✅ 已成功登記利息收入！\n• 登記人：姊姊\n• 項目：銀行利息\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
-            ))
-        return
+        if match:
+            amt = int(match.group())
+            today_str = datetime.now().strftime("%Y/%m/%d")
+            now_time = datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+            ws = get_worksheet("進項明細")
+            if ws:
+                ws.append_row([now_time, today_str, "黃芊甄", "存款利息", "銀行存款利息", amt, "網銀核對登記"])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✅ 已成功登記利息收入！\n• 登記人：黃芊甄\n• 項目：銀行利息\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
+                ))
+            return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💰 請輸入銀行利息金額，例如：`利息 250`！"))
+            return
 
-    # ── 9. 強大語音輸入記帳辨識（例如：「黃士龍買水果600元」）──
+    # ── 9. 強大語音輸入記帳辨識（例如：「黃志龍買水果600元」）──
     expense_data = parse_voice_expense(text, user_name)
     if expense_data:
         today_str = datetime.now().strftime("%Y/%m/%d")
@@ -575,13 +603,18 @@ def handle_text_message(event):
                 expense_data["item"], expense_data["amount"], "", "LINE語音快速記帳"
             ])
             line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✅ 【語音記帳成功！】\n• 日期：{today_str}\n• 代墊人：{expense_data['spender']}\n• 分類：{expense_data['category']}\n• 品項：{expense_data['item']}\n• 金額：{expense_data['amount']:,} 元\n\n已同步寫入 Google 試算表，感謝您的貼心照料！"
+                text=f"✅ 【語音記帳成功！】\n• 購買日期：{today_str}\n• 支出代墊：{expense_data['spender']}\n• 費用類別：{expense_data['category']}\n• 購買品項：{expense_data['item']}\n• 支出金額：{expense_data['amount']:,} 元\n\n已同步寫入 Google 試算表，感謝用心照顧！"
+            ))
+            return
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"⚠️ 辨識到記帳：{expense_data['spender']} 買 {expense_data['item']} {expense_data['amount']}元，但目前試算表連線中，請稍候重試！"
             ))
             return
 
     # ── 通用回應 ──
     line_bot_api.reply_message(event.reply_token, TextSendMessage(
-        text=f"您好，{user_name}！爸爸照顧小秘書隨時為您服務。\n\n🎙️ 快速記帳只要用語音說：\n「黃士龍買水果600元」或「買尿布850」\n\n💡 或點選下方圖文選單查看收支總表與高醫回診！"
+        text=f"您好，{user_name}！爸爸照顧小秘書隨時為全家人服務。\n\n🎙️ 快速記帳只要說：\n「黃志龍買水果600元」或「黃志龍買尿布850」\n\n💡 或點選下方圖文選單查看收支總表與高醫回診！"
     ))
 
 @handler.add(MessageEvent, message=ImageMessage)
@@ -594,7 +627,7 @@ def handle_image_message(event):
         user_name = "家人"
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(
-        text=f"📸 收到 {user_name} 傳送的照片！\n\n若這是【發票/收據報銷】，請在此接著說或打字「品項與金額」（例如：`水果 600` 或 `尿布 850`），系統將自動為您歸檔完成記帳！\n\n若這是爸爸的生活照片，已備查留存，感謝您的細心陪伴！"
+        text=f"📸 收到 {user_name} 傳送的照片！\n\n• 若是【發票/收據報銷】：請直接接著用語音或文字回傳「品項與金額」（例如：`水果 600` 或 `尿布 850`），系統會立即為您完成記帳！\n\n• 若是【回診新藥袋/用藥照片】：請直接回傳藥名與服用時段（例如：`新陳代謝科血壓藥 早上飯後1顆`），系統會自動為您備查並收錄至用藥手冊！\n\n• 若是【生活日誌照片】：已存檔備查，感謝您的貼心照料！"
     ))
 
 # ==================== Web 網頁表單 (記帳、進項、高醫回診、用藥、日誌) ====================
@@ -633,11 +666,11 @@ EXPENSE_FORM_HTML = """
         <div class="form-group">
           <label>支出人 / 代墊人</label>
           <select name="spender" required>
-            <option value="黃士龍">黃士龍 (弟弟)</option>
-            <option value="弟妹">弟妹</option>
-            <option value="姊姊">姊姊</option>
-            <option value="Sandy">Sandy</option>
-            <option value="其他">其他</option>
+            <option value="黃志龍">黃志龍 (弟弟)</option>
+            <option value="塗雅芳">塗雅芳 (弟妹)</option>
+            <option value="黃志嘉">黃志嘉 (哥哥)</option>
+            <option value="黃芊甄">黃芊甄 (姊姊)</option>
+            <option value="黃蕙芬">黃蕙芬 (Sandy)</option>
           </select>
         </div>
         <div class="form-group">
@@ -723,29 +756,30 @@ INCOME_FORM_HTML = """
         <div class="form-group">
           <label>登記人</label>
           <select name="recorder" required>
-            <option value="Sandy">Sandy</option>
-            <option value="姊姊">姊姊</option>
-            <option value="黃士龍">黃士龍</option>
-            <option value="其他">其他</option>
+            <option value="黃蕙芬">黃蕙芬 (Sandy)</option>
+            <option value="黃芊甄">黃芊甄 (姊姊)</option>
+            <option value="黃志嘉">黃志嘉 (哥哥)</option>
+            <option value="黃志龍">黃志龍 (弟弟)</option>
+            <option value="塗雅芳">塗雅芳 (弟妹)</option>
           </select>
         </div>
         <div class="form-group">
           <label>進項來源類別</label>
           <select name="category" required>
-            <option value="房屋租金">房屋租金 (Sandy匯入)</option>
-            <option value="政府津貼">政府老人年金/老農津貼</option>
-            <option value="債券收益">債券利息/配息收益</option>
-            <option value="存款利息">銀行活存/定存利息</option>
+            <option value="房屋租金">房屋租金 (黃蕙芬 實收淨額匯入)</option>
+            <option value="政府津貼">政府老人年金/津貼 (黃芊甄)</option>
+            <option value="債券收益">債券利息/配息收益 (黃芊甄)</option>
+            <option value="存款利息">銀行活存/定存利息 (黃芊甄)</option>
             <option value="其他收入">其他專戶入帳</option>
           </select>
         </div>
         <div class="form-group">
           <label>進項說明</label>
-          <input type="text" name="desc" placeholder="例如：10月份房屋租金 或 10月老人年金" required>
+          <input type="text" name="desc" placeholder="例如：10月份房屋租金(扣除維修/管理費) 或 老人年金" required>
         </div>
         <div class="form-group">
           <label>入帳金額 (元)</label>
-          <input type="number" name="amount" placeholder="例如：20000" required>
+          <input type="number" name="amount" placeholder="例如：18500" required>
         </div>
         <button type="submit">確認入帳並送出</button>
       </form>
@@ -810,9 +844,9 @@ CLINIC_FORM_HTML = """
         <div class="form-group">
           <label>看診科別</label>
           <select name="dept" required>
-            <option value="神經內科">神經內科 (認知退化/失智專科)</option>
-            <option value="新陳代謝科">新陳代謝科 (血糖/慢性病控制)</option>
-            <option value="其他科別">其他科別</option>
+            <option value="神經內科 (失智認知)">神經內科 (失智認知退化專科)</option>
+            <option value="新陳代謝科 (血糖血壓)">新陳代謝科 (血糖與血壓控制)</option>
+            <option value="其他專科">其他專科門診</option>
           </select>
         </div>
         <div class="form-group">
@@ -886,7 +920,7 @@ MED_FORM_HTML = """
   <div class="card">
     {% if success %}
       <div class="success">
-        🎉 藥品新增成功！<br>已同步更新至用藥手冊！
+        🎉 藥品新增成功！<br>已同步更新至現行用藥手冊！
       </div>
     {% else %}
       <h2>💊 新增/維護現行用藥</h2>
@@ -897,7 +931,7 @@ MED_FORM_HTML = """
         </div>
         <div class="form-group">
           <label>作用 / 用途</label>
-          <input type="text" name="usage" placeholder="例如：神經內科/失智記憶保養、血糖控制" required>
+          <input type="text" name="usage" placeholder="例如：神經內科/失智記憶保養、新陳代謝科/血糖與血壓控制" required>
         </div>
         <div class="form-group">
           <label>服用時段</label>
@@ -976,11 +1010,11 @@ LOG_FORM_HTML = """
         <div class="form-group">
           <label>記錄人</label>
           <select name="author">
-            <option value="黃士龍">黃士龍 (弟弟)</option>
-            <option value="弟妹">弟妹</option>
-            <option value="姊姊">姊姊</option>
-            <option value="Sandy">Sandy</option>
-            <option value="其他">其他</option>
+            <option value="黃志龍">黃志龍 (弟弟)</option>
+            <option value="塗雅芳">塗雅芳 (弟妹)</option>
+            <option value="黃志嘉">黃志嘉 (哥哥)</option>
+            <option value="黃芊甄">黃芊甄 (姊姊)</option>
+            <option value="黃蕙芬">黃蕙芬 (Sandy)</option>
           </select>
         </div>
         <div class="form-group">
