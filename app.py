@@ -387,6 +387,7 @@ def create_summary_flex(month_str, total_income, total_expense, net_balance, cat
                     SeparatorComponent(margin='md'),
                     ButtonComponent(action=MessageAction(label="👥 姐姐結帳專用：本月各人代墊彙整", text="各人代墊結算"), style='primary', color='#e63946', height='sm'),
                     ButtonComponent(action=MessageAction(label="📋 查看本月支出流水帳", text="查詢最近支出"), style='secondary', height='sm', margin='xs'),
+                    ButtonComponent(action=MessageAction(label="✏️ 月底對帳：修正專戶總結餘", text="修正總金額"), style='secondary', height='sm', margin='xs'),
                 ])
             ])
         )
@@ -434,6 +435,42 @@ def create_settlement_flex(month_str, member_expenses, total_expense):
                     SeparatorComponent(margin='md'),
                     TextComponent(text="📌 說明：姊姊匯款後，該月代墊款即已由照顧專戶支應平帳。", size='xxs', color='#888888', wrap=True),
                     ButtonComponent(action=MessageAction(label="📊 返回本月收支總表", text="本月收支總表"), style='secondary', height='sm', margin='sm'),
+                    ButtonComponent(action=MessageAction(label="✏️ 校正專戶總結餘", text="修正總金額"), style='secondary', height='sm', margin='xs'),
+                ])
+            ])
+        )
+    )
+
+# ==================== 3c. 專戶總結餘修正引導卡片 ====================
+def create_adjust_balance_guide_flex(current_balance):
+    return FlexSendMessage(
+        alt_text="【月底校正】爸爸照顧專戶總結餘修正",
+        contents=BubbleContainer(
+            body=BoxComponent(layout='vertical', padding_all='none', contents=[
+                BoxComponent(layout='vertical', padding_all='lg', background_color='#457b9d', contents=[
+                    TextComponent(text="✏️ 照顧專戶 ｜ 月底總結餘修正", weight='bold', size='md', color='#ffffff'),
+                    TextComponent(text="核對網銀/存摺真實餘額，即時校正結算", size='xs', color='#e8f4f8', margin='xs'),
+                ]),
+                BoxComponent(layout='vertical', padding_all='lg', spacing='sm', contents=[
+                    BoxComponent(
+                        layout='vertical',
+                        background_color='#f1faee',
+                        padding_all='md',
+                        corner_radius='md',
+                        contents=[
+                            TextComponent(text="💰 系統目前計算總結餘", size='xs', color='#457b9d', weight='bold'),
+                            TextComponent(text=f"${current_balance:,} 元", size='xl', color='#1d3557', weight='bold', margin='xs'),
+                        ]
+                    ),
+                    SeparatorComponent(margin='md'),
+                    TextComponent(text="💡 使用情境說明：", weight='bold', size='xs', color='#333333'),
+                    TextComponent(text="若平時有零星進項或支出忘記登記，月底負責人核對存摺真實金額後，可直接修正專戶總額平帳！", size='xs', color='#666666', wrap=True),
+                    SeparatorComponent(margin='md'),
+                    TextComponent(text="📋 兩種便利修正方式：", weight='bold', size='xs', color='#333333'),
+                    TextComponent(text="👉 方式一：直接在對話框輸入\n「修正總額 635008」\n（可加備註，如：修正總額 635008 10月底對帳）\n\n👉 方式二：點擊下方按鈕開啟線上表單直接填寫！", size='xs', color='#555555', wrap=True),
+                    SeparatorComponent(margin='md'),
+                    ButtonComponent(action=URIAction(label="🌐 開啟線上快速校正表單", uri=f"{BASE_URL}/adjust_balance"), style='primary', color='#457b9d', height='sm'),
+                    ButtonComponent(action=MessageAction(label="📊 返回本月收支總表", text="本月收支總表"), style='secondary', height='sm', margin='xs'),
                 ])
             ])
         )
@@ -1014,28 +1051,66 @@ def handle_text_message(event):
                     text=f"✅ 已成功登記利息收入！\n• 登記人：黃芊甄\n• 項目：銀行利息\n• 金額：{amt:,} 元\n• 入帳日期：{today_str}\n已計入專戶！"
                 ))
             return
-    # ── 8b. 設定/更新專戶結算基準總額（例如姊姊輸入：設定總額 635008）──
-    if "設定總額" in text or "更新總額" in text or "結算總額" in text:
+    # ── 8b. 設定/修正專戶結算基準總額（例如：修正總金額 635008、設定總額 635008）──
+    adjust_keywords = ["修正總金額", "修正總額", "修正餘額", "修正總結餘", "修改總額", "修改餘額", "校正總額", "校正餘額", "調整總額", "調整餘額", "設定總額", "更新總額", "結算總額", "修正金額"]
+    if any(kw in text for kw in adjust_keywords):
         match = re.search(r'\d+', text)
         if match:
             new_base = int(match.group())
+            # 取得自訂備註說明（去除關鍵字與數字）
+            custom_note = text
+            for kw in adjust_keywords:
+                custom_note = custom_note.replace(kw, "")
+            custom_note = custom_note.replace(str(new_base), "").replace("，", "").replace(",", "").strip()
+            if not custom_note:
+                custom_note = "月底核對存摺對帳校正"
+            
             today_str = datetime.now().strftime("%Y/%m/%d")
             now = datetime.now()
             month_str = f"{now.year}年{now.month}月"
             ws_sum = get_worksheet("收支總表")
             if ws_sum:
-                ws_sum.append_row([
-                    month_str, 0, 0, 0, new_base,
-                    f"{user_name}於 {today_str} 設定/結算專戶基準總額 {new_base:,} 元"
-                ])
+                note_str = f"期初基準結餘 {new_base:,} 元 ({user_name}於 {today_str} {custom_note})"
+                # 尋找當月列更新，或新增一列
+                sum_rows = ws_sum.get_all_values()
+                found_idx = -1
+                for idx, sr in enumerate(sum_rows[1:], start=2):
+                    if len(sr) > 0 and (month_str in sr[0] or f"{now.year}/{now.month:02d}" in sr[0]):
+                        found_idx = idx
+                        break
+                if found_idx > 0:
+                    ws_sum.update(f"A{found_idx}:F{found_idx}", [[
+                        month_str, 0, 0, 0, new_base, note_str
+                    ]])
+                else:
+                    ws_sum.append_row([
+                        month_str, 0, 0, 0, new_base, note_str
+                    ])
+
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text=f"✅ 已成功更新照顧專戶結算基準總額！\n• 設定人：{user_name}\n• 專戶基準總額：{new_base:,} 元\n• 結算日期：{today_str}\n\n今後所有新增的進項與支出，都會以此總額為基準自動增減結餘！"
+                    text=f"✅ 已成功修正照顧專戶總結餘！\n\n"
+                         f"• 操作人：{user_name}\n"
+                         f"• 最新專戶總結餘：${new_base:,} 元\n"
+                         f"• 校正日期：{today_str}\n"
+                         f"• 備註說明：{custom_note}\n\n"
+                         f"系統已將專戶總結餘校正完畢，後續所有進項與支出都將以此基準持續累計！"
                 ))
             else:
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 目前試算表連線中，請稍候重試！"))
             return
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="💰 請輸入欲設定的帳戶總額，例如：`設定總額 635008`！"))
+            # 使用者只輸入了「修正總金額」等指令（未帶金額），跳出引導卡片
+            ws_sum = get_worksheet("收支總表")
+            current_bal = 635008
+            if ws_sum:
+                try:
+                    s_rows = ws_sum.get_all_values()
+                    if len(s_rows) > 1:
+                        last_row = s_rows[-1]
+                        current_bal = clean_num(last_row[4]) if len(last_row) > 4 else 635008
+                except Exception:
+                    pass
+            line_bot_api.reply_message(event.reply_token, create_adjust_balance_guide_flex(current_bal))
             return
 
 
@@ -1542,6 +1617,151 @@ def log_form():
 
         return render_template_string(LOG_FORM_HTML, success=True)
     return render_template_string(LOG_FORM_HTML, success=False)
+
+# ==================== 專戶總結餘修正表單 ====================
+ADJUST_FORM_HTML = """
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>修正專戶總結餘 ｜ 爸爸照顧專戶</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #333; }
+    .card { background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); max-width: 480px; margin: 0 auto; }
+    .header { text-align: center; margin-bottom: 20px; }
+    h2 { color: #1d3557; margin: 0 0 6px 0; font-size: 21px; }
+    .subtitle { color: #6c757d; font-size: 13px; margin: 0; }
+    .current-box { background: #f1faee; border: 1px solid #a8dadc; border-radius: 10px; padding: 14px; text-align: center; margin-bottom: 20px; }
+    .current-label { font-size: 13px; color: #457b9d; font-weight: bold; margin-bottom: 4px; }
+    .current-amount { font-size: 26px; color: #1d3557; font-weight: 800; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 6px; color: #343a40; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+    input:focus, select:focus, textarea:focus { border-color: #457b9d; outline: none; box-shadow: 0 0 0 3px rgba(69,123,157,0.2); }
+    .tip { font-size: 12px; color: #6c757d; margin-top: 5px; line-height: 1.4; }
+    button { width: 100%; background: #457b9d; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: background 0.2s; }
+    button:active { background: #1d3557; }
+    .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 18px; border-radius: 10px; text-align: center; font-weight: bold; line-height: 1.6; }
+    .back-btn { display: inline-block; margin-top: 15px; padding: 10px 20px; background: #155724; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    {% if success %}
+      <div class="success">
+        🎉 專戶總結餘修正成功！<br>
+        最新專戶結算總額：<strong>${{ new_amount }} 元</strong><br>
+        <span style="font-size: 13px; color: #28a745;">已同步更新至 Google 試算表《收支總表》</span><br>
+        <a href="https://line.me/R/" class="back-btn">返回 LINE 查看</a>
+      </div>
+    {% else %}
+      <div class="header">
+        <h2>✏️ 爸爸照顧專戶總結餘修正</h2>
+        <p class="subtitle">月底核對存摺/網銀真實餘額時，一鍵平帳校正</p>
+      </div>
+
+      <div class="current-box">
+        <div class="current-label">💰 系統目前計算總結餘</div>
+        <div class="current-amount">${{ current_amount }} 元</div>
+      </div>
+
+      <form method="POST">
+        <div class="form-group">
+          <label>校正後真實專戶總金額 (元) *</label>
+          <input type="number" name="amount" placeholder="例如：635008 或 635000" value="{{ current_raw }}" required>
+          <div class="tip">💡 請以實際銀行存摺或網銀結餘金額為準填寫。</div>
+        </div>
+
+        <div class="form-group">
+          <label>操作負責人 *</label>
+          <select name="author" required>
+            <option value="黃芊甄">黃芊甄 (姊姊 - 財務負責)</option>
+            <option value="黃蕙芬" selected>黃蕙芬 (Sandy)</option>
+            <option value="黃志嘉">黃志嘉 (哥哥)</option>
+            <option value="黃志龍">黃志龍 (弟弟)</option>
+            <option value="塗雅芳">塗雅芳 (弟妹)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>校正原因 / 備註說明 (選填)</label>
+          <input type="text" name="note" placeholder="例如：月底網銀存摺對帳、補登未列帳雜支">
+          <div class="tip">💡 此備註將永久留存於雲端《收支總表》供家人查閱。</div>
+        </div>
+
+        <button type="submit">確認修正並更新專戶</button>
+      </form>
+    {% endif %}
+  </div>
+</body>
+</html>
+"""
+
+@app.route("/adjust_balance", methods=['GET', 'POST'])
+def adjust_balance():
+    ws_sum = get_worksheet("收支總表")
+    now = datetime.now()
+    month_str = f"{now.year}年{now.month}月"
+    today_str = now.strftime("%Y/%m/%d")
+
+    # 取得當前總結餘
+    current_bal = 635008
+    if ws_sum:
+        try:
+            s_rows = ws_sum.get_all_values()
+            if len(s_rows) > 1:
+                last_row = s_rows[-1]
+                current_bal = clean_num(last_row[4]) if len(last_row) > 4 else 635008
+        except Exception:
+            pass
+
+    if request.method == 'POST':
+        amt_str = request.form.get("amount", "").strip()
+        author  = request.form.get("author", "黃蕙芬").strip()
+        note    = request.form.get("note", "").strip()
+        if not note:
+            note = "月底核對存摺對帳校正"
+
+        try:
+            new_amount = int(re.sub(r'[^\d]', '', amt_str))
+        except Exception:
+            new_amount = current_bal
+
+        if ws_sum:
+            try:
+                note_str = f"期初基準結餘 {new_amount:,} 元 ({author}於 {today_str} {note})"
+                sum_rows = ws_sum.get_all_values()
+                found_idx = -1
+                for idx, sr in enumerate(sum_rows[1:], start=2):
+                    if len(sr) > 0 and (month_str in sr[0] or f"{now.year}/{now.month:02d}" in sr[0]):
+                        found_idx = idx
+                        break
+                if found_idx > 0:
+                    ws_sum.update(f"A{found_idx}:F{found_idx}", [[
+                        month_str, 0, 0, 0, new_amount, note_str
+                    ]])
+                else:
+                    ws_sum.append_row([
+                        month_str, 0, 0, 0, new_amount, note_str
+                    ])
+            except Exception as e:
+                print(f"網頁端更新收支總表失敗: {e}")
+
+        return render_template_string(
+            ADJUST_FORM_HTML,
+            success=True,
+            new_amount=f"{new_amount:,}",
+            current_amount=f"{new_amount:,}",
+            current_raw=new_amount
+        )
+
+    return render_template_string(
+        ADJUST_FORM_HTML,
+        success=False,
+        current_amount=f"{current_bal:,}",
+        current_raw=current_bal
+    )
 
 @app.route("/health")
 def health():
