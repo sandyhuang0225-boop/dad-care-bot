@@ -776,18 +776,24 @@ def handle_text_message(event):
                     if not found:
                         categories["日常雜支"] += amt
 
-        # 讀取「收支總表」中的基準金額 (例如姐姐10/1結算的 635,008 元)
+        # 照顧專戶起始結算基準 (2026/10/1 姐姐結算基準: 635,008 元)
+        BASE_STARTING_BALANCE = 635008
+        base_balance = BASE_STARTING_BALANCE
         ws_sum = get_worksheet("收支總表")
-        base_balance = 635008
         if ws_sum:
-            sum_rows = ws_sum.get_all_values()
-            if len(sum_rows) > 1:
-                # 尋找基準結餘
-                for sr in sum_rows[1:]:
-                    bal = clean_num(sr[4]) if len(sr) > 4 else 0
-                    if bal > 0:
-                        base_balance = bal
-                        break
+            try:
+                sum_rows = ws_sum.get_all_values()
+                if len(sum_rows) > 1:
+                    # 優先檢查是否有手動透過指令設定的最新基準總額
+                    for sr in reversed(sum_rows[1:]):
+                        note = sr[5] if len(sr) > 5 else ""
+                        if "設定/結算專戶基準總額" in note or "期初基準結餘" in note:
+                            b_val = clean_num(sr[4]) if len(sr) > 4 else 0
+                            if b_val > 0:
+                                base_balance = b_val
+                                break
+            except Exception as se:
+                print(f"讀取收支總表基準失敗: {se}")
 
         net_bal = total_income - total_expense
         current_balance = base_balance + net_bal
@@ -805,12 +811,12 @@ def handle_text_message(event):
                 if found_idx > 0:
                     ws_sum.update(f"A{found_idx}:F{found_idx}", [[
                         month_str, total_income, total_expense, net_bal, current_balance,
-                        f"自動結算 (基準635,008 + 進項{total_income} - 支出{total_expense})"
+                        f"自動結算 (基準{base_balance:,} + 進項{total_income} - 支出{total_expense})"
                     ]])
                 else:
                     ws_sum.append_row([
                         month_str, total_income, total_expense, net_bal, current_balance,
-                        f"自動結算 (基準635,008 + 進項{total_income} - 支出{total_expense})"
+                        f"自動結算 (基準{base_balance:,} + 進項{total_income} - 支出{total_expense})"
                     ])
             except Exception as e:
                 print(f"同步收支總表失敗: {e}")
